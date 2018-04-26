@@ -19,32 +19,66 @@ function Promise(executor) {
     if (_this.status === 'pending') {
       _this.status = 'rejected';
       _this.reason = reason;
-      _.onRejectdCallbacks.forEach(function (fn) {
+      _this.onRejectdCallbacks.forEach(function (fn) {
         fn();
       })
     }
   }
-  executor(resolve, reject);
+  try {
+    executor(resolve, reject);
+  } catch (e) {
+    reject(e)
+  }
 }
 
 Promise.prototype.then = function (onFulfilled, onRjected) {
+  // 返回状态改变的promise，由于状态改变就不能改变了，所以需要返回一个新的，
+  // 状态已经改变的promise
   let _this = this;
+  let promise2;
   // then执行的时候就判断，但是promise中的函数状态仍然处于pending状态
   if (_this.status === 'resolved') {
-    onFulfilled(_this.value);
+    promise2 = new Promise(function (resolve, reject) {
+      try {
+        let x = onFulfilled(_this.value);
+        resolve(x);
+      } catch (e) {
+        reject(e)
+      }
+    })
+
   }
   if (_this.status === 'rejected') {
-    onRjected(_this.reason);
+    promise2 = new Promise(function (resolve, reject) {
+      try {
+        let x = onRjected(_this.reason);
+        resolve(x);
+      } catch (e) {
+        reject(e);
+      }
+    })
   }
   // 状态是pending时的处理，异步处理
   if (_this.status === 'pending') {
-    _this.onResolvedCallbacks.push(function () {
-      onFulfilled(_this.value);
-    });
-    _this.onRejectdCallbacks.push(function () {
-      onRjected(_this.reason);
+    promise2 = new Promise(function (resolve, reject) {
+      _this.onResolvedCallbacks.push(function () {
+        try {
+          let x = onFulfilled(_this.value);
+          resolve(x);
+        } catch (e) {
+          reject(e)
+        }
+      });
+      _this.onRejectdCallbacks.push(function () {
+        try {
+          let x = onRjected(_this.reason);
+          resolve(x);
+        } catch (e) {
+          reject(e);
+        }
+      })
     })
   }
-
+  return promise2
 }
 module.exports = Promise
